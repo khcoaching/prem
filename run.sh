@@ -1,4 +1,5 @@
 #! /bin/bash
+source ~/.env
 NOW=$(date +"%D %T")
 echo $NOW
 
