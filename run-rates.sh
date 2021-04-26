@@ -1,5 +1,5 @@
 #! /bin/bash
-exec >> $BASE_PATH/log.txt
+exec >> "$BASE_PATH/log.txt"
 exec 2>&1
 
 NOW=$(date +"%D %T")
