@@ -8,5 +8,5 @@ echo $NOW
 echo 'Running graph Node.js app'
 cd $KIMCHI_PATH
 node index.js
-git commit -am "$NOW"
+git commit -am "$NOW - Update Graphs"
 git push origin main
