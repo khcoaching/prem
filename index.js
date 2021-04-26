@@ -25,7 +25,7 @@ const graphs = {
   },
   coinone: {
     path: getPath('coinone.json'),
-    title: 'Coinone KRW Million',
+    title: 'Coinone USD',
     tradeUrl: 'https://api.coinone.co.kr/trades',
   },
 };
