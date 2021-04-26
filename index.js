@@ -3,26 +3,34 @@ const co = require('co');
 const generate = require('node-chartist');
 const fetch = require('node-fetch');
 
-const exRates = require(process.env.EXCHANGE_RATES_PATH || './exchange-rates.json');
+const basePath = process.env.BASE_PATH || './';
+function getPath(filename) {
+  const lastChar = basePath.charAt(basePath.length - 1);
+  const path = lastChar === '/' ? basePath : `${basePath}/`;
+
+  return `${path}${filename}`;
+}
+
+const exRates = require(getPath('exchange-rates.json'));
 
 const graphs = {
   premium: {
-    path: process.env.PREMIUM_PATH || './premium.json',
+    path: getPath('premium.json'),
     title: 'Kimchi Premium %',
   },
   coinbase: {
-    path: process.env.COINBASE_PATH || './coinbase.json',
+    path: getPath('coinbase.json'),
     title: 'Coinbase USD',
     tradeUrl: 'https://api.pro.coinbase.com/products/btc-usd/trades',
   },
   coinone: {
-    path: process.env.COINEONE_PATH || './coinone.json',
+    path: getPath('coinone.json'),
     title: 'Coinone KRW Million',
     tradeUrl: 'https://api.coinone.co.kr/trades',
   },
 };
 
-const notifyPath = process.env.NOTIFY_PATH || './notify.json';
+const notifyPath = getPath('notify.json');
 const notifyLow= parseFloat(process.env.NOTIFY_LOW) || 2;
 const notifyHigh = parseFloat(process.env.NOTIFY_HIGH) || 10;
 const lastNotification = new Date(require(notifyPath));

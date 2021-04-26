@@ -1,7 +1,14 @@
 const fs = require('fs');
 const fetch = require('node-fetch');
 
-const path = process.env.EXCHANGE_RATES_PATH || './exchange-rates.json';
+const basePath = process.env.BASE_PATH || './';
+function getPath(filename) {
+  const lastChar = basePath.charAt(basePath.length - 1);
+  const path = lastChar === '/' ? basePath : `${basePath}/`;
+
+  return `${path}${filename}`;
+}
+const path = getPath('exchange-rates.json');
 let keys = process.env.FIXER_API_KEYS;
 
 if (keys == null || keys.length === 0) {
