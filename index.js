@@ -5,21 +5,51 @@ const fetch = require('node-fetch');
 
 const exRates = require('./exchange-rates.json');
 
-const filenames = {
-  './premium.json': 'Kimchi Premium %',
-  './coinbase.json': 'Coinbase USD',
-  './coinone.json': 'Coinone KRW Million',
-}
+const graphs = {
+  premium: {
+    path: './premium.json',
+    title: 'Kimchi Premium %',
+  },
+  coinbase: {
+    path: './coinbase.json',
+    title: 'Coinbase USD',
+    tradeUrl: 'https://api.pro.coinbase.com/products/btc-usd/trades',
+  },
+  coinone: {
+    path: './coinone.json',
+    title: 'Coinone KRW Million',
+    tradeUrl: 'https://api.coinone.co.kr/trades',
+  },
+};
 
-const titleRex = /\.\/([^\.]+)\.json/
-const coinbaseUrl = 'https://api.pro.coinbase.com/products/btc-usd/trades';
-const coinoneUrl = 'https://api.coinone.co.kr/trades';
+const notifyLow= parseFloat(process.env.NOTIFY_LOW) || 2;
+const notifyHigh = parseFloat(process.env.NOTIFY_HIGH) || 10;
+const notifyPath = './notify.json';
+const lastNotification = new Date(require(notifyPath));
 
-// (async function () {
-  // fetch data
-  // const coinbasePrice = await getCoinbase();
-  // const coinonePrice = await getCoinone();
+const fetches = [getCoinbase(), getCoinone()];
+Promise.all(fetches).then(([coinbasePrice, coinonePrice]) => {
   const krwUsd = exRates.krw;
+  const current = {
+    coinbase: coinbasePrice,
+    coinone: coinonePrice * krwUsd,
+    premium: ((coinonePrice * krwUsd) - coinbasePrice) / coinbasePrice * 100,
+  };
+
+  // notify if premium falls within range, but only once an hour
+  const notifyDelta = Date.now() - lastNotification.getTime();
+  const oneHourMs = 60 * 60 * 1000;
+  if ((current.premium < notifyLow || current.premium > notifyHigh) && notifyDelta > oneHourMs) {
+    // discord notify
+    notify(current.premium).then((res) => {
+      if (res.status < 400) {
+        console.log('Sent notification to Discord');
+        fs.writeFileSync(notifyPath, JSON.stringify(new Date()), 'utf-8');
+      } else {
+        console.error('Could not send notification to Discord');
+      }
+    });
+  }
 
   // generate graph html
   co(function * () {
@@ -27,30 +57,54 @@ const coinoneUrl = 'https://api.coinone.co.kr/trades';
     const css = '<head><link rel="stylesheet" href="main.css"></head>';
     const graphHtml = [css];
 
-    for (const filename of Object.keys(filenames)) {
-      const title = filenames[filename];
-      const convert = converter(filename);
+    // iterate over configured graphs
+    for (const [name, config] of Object.entries(graphs)) {
+      const { path, title } = config;
+      console.log(`Generating graph: ${title} - ${path}`);
 
-      const series = require(filename);
-      const options = getOptions(filename);
+      // get data from disk
+      const savedData = require(path);
+      console.log(`Loaded data for ${name}: ${savedData.length}`);
+
+      // savedData + new data, trim number for graph legend
+      const trim = trimFn(name);
+      const series = savedData.concat([current[name]]).map(trim);
+
+      // get 1 day of data
+      let daySeries = [...series];
+      if (daySeries.length > 288) {
+        const index = daySeries.length - 288;
+        daySeries = daySeries.slice(index);
+      }
+
+      // configure graph
+      const options = getOptions(name);
       const data = {
         labels: ['time'],
-        series: [series.map(convert)],
+        series: [daySeries],
       };
 
-      const graph = yield generate('line', options, data); //=> chart HTML
+      // generate graph
+      const graph = yield generate('line', options, data);
       graphHtml.push(`<div><h1>${title}</h1>${graph}</div>`);
+      console.log(`Generated graph: ${title}`);
+
+
+      // persist data to disk
+      const out = JSON.stringify(series);
+      fs.writeFileSync(path, out, 'utf-8');
+      console.log(`updated ${path}`);
     }
 
+    // generate index.html and write to disk
     const html = graphHtml.join('\n');
     fs.writeFileSync('./index.html', html, 'utf-8');
+    console.log('wrote index.html');
   });
-
-  // process.exit();
-// })();
+});
 
 async function getCoinbase() {
-  const res = await fetch(coinbaseUrl);
+  const res = await fetch(graphs.coinbase.tradeUrl);
   const data = await res.json();
   const latestTradeUSD = data[0].price;
 
@@ -58,30 +112,50 @@ async function getCoinbase() {
 }
 
 async function getCoinone() {
-  const res = await fetch(coinoneUrl);
+  const res = await fetch(graphs.coinone.tradeUrl);
   const data = await res.json();
   const latestTradeKRW = data.completeOrders[0].price;
 
   return parseFloat(latestTradeKRW);
 }
 
-function converter(filename) {
+function trimFn(filename) {
   switch(filename) {
-    case './coinbase.json':
+    case 'coinbase':
       return (price) => Math.floor(price);
-    case './coinone.json':
-      return (price) => (price / 1000000).toFixed(3);
+    case 'coinone':
+      return (price) => Math.floor(price);
     default:
-      return (price) => price;
+      return (price) => parseFloat(price).toFixed(2);
   }
 }
 
 function getOptions(filename) {
   const base = {width: 800, height: 400};
   switch(filename) {
-    case './premium.json':
+    case 'premium':
       return { ...base, low: 0 }
     default:
       return base;
   }
+}
+
+async function notify(premium) {
+  const url = 'https://discord.com/api/webhooks';
+  const server =process.env.DISCORD_SERVER;
+  const hook = process.env.DISCORD_HOOK;
+
+  const content = `Kimchi Premium @ ${premium.toFixed(2)} % - https://khcoaching.github.io/prem/`;
+
+  const options = {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  }
+
+  const webhook = `${url}/${server}/${hook}`;
+  console.log(webhook);
+  return fetch(webhook, options);
 }
