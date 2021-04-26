@@ -15,7 +15,7 @@ const exRates = require(getPath('exchange-rates.json'));
 
 const graphs = {
   premium: {
-    path: getPath('premium.json');,
+    path: getPath('premium.json'),
     title: 'Kimchi Premium %',
   },
   coinbase: {
