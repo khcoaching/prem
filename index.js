@@ -3,33 +3,33 @@ const co = require('co');
 const generate = require('node-chartist');
 const fetch = require('node-fetch');
 
-const exRates = require('./exchange-rates.json');
+const exRates = require(process.env.EXCHANGE_RATES_PATH || './exchange-rates.json');
 
 const graphs = {
   premium: {
-    path: './premium.json',
+    path: process.env.PREMIUM_PATH || './premium.json',
     title: 'Kimchi Premium %',
   },
   coinbase: {
-    path: './coinbase.json',
+    path: process.env.COINBASE_PATH || './coinbase.json',
     title: 'Coinbase USD',
     tradeUrl: 'https://api.pro.coinbase.com/products/btc-usd/trades',
   },
   coinone: {
-    path: './coinone.json',
+    path: process.env.COINEONE_PATH || './coinone.json',
     title: 'Coinone KRW Million',
     tradeUrl: 'https://api.coinone.co.kr/trades',
   },
 };
 
+const notifyPath = process.env.NOTIFY_PATH || './notify.json';
 const notifyLow= parseFloat(process.env.NOTIFY_LOW) || 2;
 const notifyHigh = parseFloat(process.env.NOTIFY_HIGH) || 10;
-const notifyPath = './notify.json';
 const lastNotification = new Date(require(notifyPath));
 
 const fetches = [getCoinbase(), getCoinone()];
 Promise.all(fetches).then(([coinbasePrice, coinonePrice]) => {
-  const krwUsd = exRates.krw;
+  const krwUsd = parseFloat(exRates.krw);
   const current = {
     coinbase: coinbasePrice,
     coinone: coinonePrice * krwUsd,
