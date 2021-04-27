@@ -47,7 +47,10 @@ Promise.all(fetches).then(([coinbasePrice, coinonePrice]) => {
   // notify if premium falls within range, but only once an hour
   const notifyDelta = Date.now() - lastNotification.getTime();
   const oneHourMs = 60 * 60 * 1000;
-  if ((current.premium < notifyLow || current.premium > notifyHigh) && notifyDelta > oneHourMs) {
+  const hourElapsed = notifyDelta > oneHourMs;
+  const dayElapsed = notifyDelta > oneHourMs * 24;
+  const withinRange = current.premium < notifyLow || current.premium > notifyHigh;
+  if ((withinRange && hourElapsed) || dayElapsed) {
     // discord notify
     notify(current.premium).then((res) => {
       if (res.status < 400) {
